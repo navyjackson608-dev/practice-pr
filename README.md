@@ -2,7 +2,7 @@
 
 A simple Python utility for common string operations.
 
-## Fetures
+## Features
 
 - Count words in a string
 - Reverse a string  
@@ -18,6 +18,6 @@ print(reverse_string("hello"))      # "olleh"
 print(is_palindrome("racecar"))     # True
 ```
 
-## Instalation
+## Installation
 
-No external dependancies required. Python 3.8+ recomended.
+No external dependencies required. Python 3.8+ recommended.
