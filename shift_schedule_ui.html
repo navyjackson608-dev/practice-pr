@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>月間シフト表</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    #root { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN',
+                   'Noto Sans JP', 'Meiryo', sans-serif;
+      background: #eef0f4;
+    }
+
+    .app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ─── HEADER ─── */
+    .hdr {
+      background: linear-gradient(90deg, #0d2e56 0%, #1a5fa8 100%);
+      color: #fff;
+      padding: 9px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+    .hdr h1 { font-size: 16px; font-weight: 700; white-space: nowrap; }
+
+    .nav { display: flex; align-items: center; gap: 5px; }
+    .nav-btn {
+      width: 26px; height: 26px;
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 5px;
+      background: rgba(255,255,255,.13);
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1;
+      transition: background .15s;
+    }
+    .nav-btn:hover { background: rgba(255,255,255,.28); }
+    .nav-lbl { font-size: 14px; font-weight: 700; width: 94px; text-align: center; }
+
+    .search {
+      padding: 5px 10px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,.3);
+      background: rgba(255,255,255,.13);
+      color: #fff;
+      font-size: 12px;
+      width: 150px;
+      outline: none;
+    }
+    .search::placeholder { color: rgba(255,255,255,.5); }
+    .search:focus { background: rgba(255,255,255,.22); }
+
+    .legend { display: flex; gap: 8px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+    .chip {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .legend-hint { font-size: 11px; opacity: .65; }
+
+    /* ─── STATS BAR ─── */
+    .stats {
+      background: #fff;
+      border-bottom: 1px solid #dde1e8;
+      padding: 6px 18px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-shrink: 0;
+      font-size: 12px;
+    }
+    .stats-lbl { font-weight: 700; color: #333; }
+    .stat { display: flex; align-items: center; gap: 4px; }
+    .stat-cnt { font-weight: 700; font-size: 14px; }
+    .stats-hint { margin-left: auto; color: #aaa; font-size: 11px; white-space: nowrap; }
+
+    /* ─── TABLE WRAP ─── */
+    .tbl-wrap {
+      flex: 1;
+      overflow: auto;
+      background: #fff;
+      position: relative;
+    }
+
+    /* ─── TABLE ─── */
+    table { border-collapse: collapse; font-size: 12px; }
+    th, td { border: 1px solid #d8dee8; }
+
+    /* sticky: header row */
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 6;
+      background: #e4eaf4;
+    }
+    /* sticky: top-left name header */
+    thead th.c-name { z-index: 8; background: #cdd6e8; }
+    /* sticky: top-right summary header */
+    thead th.c-sum  { z-index: 8; background: #cdd6e8; }
+
+    /* sticky: body name cell */
+    td.c-name {
+      position: sticky; left: 0; z-index: 2;
+      background: #fff;
+      border-right: 2px solid #b8c6d8;
+    }
+    tr:nth-child(even) td.c-name { background: #f7f9fc; }
+
+    /* sticky: body summary cell */
+    td.c-sum {
+      position: sticky; right: 0; z-index: 2;
+      background: #f4f6fa;
+      border-left: 2px solid #b8c6d8;
+    }
+    tr:nth-child(even) td.c-sum { background: #edf0f6; }
+
+    /* name column sizing */
+    .c-name {
+      min-width: 90px; max-width: 90px;
+      padding: 4px 7px;
+      text-align: center;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+    thead .c-name { font-size: 11px; font-weight: 700; }
+
+    /* summary column */
+    .c-sum {
+      min-width: 124px;
+      padding: 3px 5px;
+      text-align: center;
+      white-space: nowrap;
+    }
+    thead .c-sum { font-size: 11px; font-weight: 700; }
+
+    /* day header */
+    .c-day {
+      text-align: center;
+      min-width: 40px;
+      padding: 3px 1px;
+    }
+    .c-day .dn { font-size: 12px; font-weight: 700; line-height: 1.4; }
+    .c-day .dw { font-size: 10px; line-height: 1; }
+    .sat-h .dn, .sat-h .dw { color: #1e40af; }
+    .sun-h .dn, .sun-h .dw { color: #991b1b; }
+    .today-h { background: #d1fae5 !important; }
+    .today-h .dn { color: #065f46 !important; }
+
+    /* totals row (first body row) */
+    tr.tot td { background: #e8edf6; font-size: 10px; text-align: center; padding: 1px 0; }
+    tr.tot td.c-name { background: #d4dcea; font-size: 11px; font-weight: 700; }
+    tr.tot td.c-sum  { background: #d4dcea; }
+
+    /* hover */
+    tbody tr:not(.tot):hover td { background: #eff6ff !important; }
+
+    /* shift cell */
+    td.sc {
+      text-align: center;
+      height: 28px;
+      cursor: pointer;
+      user-select: none;
+      transition: filter .1s;
+    }
+    td.sc:hover { filter: brightness(.84); }
+    td.sc.we { background: rgba(196,210,240,.18); }
+    td.sc.today-h { background: #d1fae5 !important; }
+
+    /* badges */
+    .sb {
+      display: inline-block;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      pointer-events: none;
+    }
+    .sc-chip {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #fff;
+      margin: 1px;
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+
+const SHIFTS = ['日勤', '遅出', '待機', '残'];
+const CYCLE  = ['', ...SHIFTS];
+const C = { '日勤':'#2563eb', '遅出':'#16a34a', '待機':'#d97706', '残':'#dc2626' };
+const DOW = ['日','月','火','水','木','金','土'];
+
+const STAFF = [
+  '田中 太郎','鈴木 花子','佐藤 一郎','山田 美咲','伊藤 健',
+  '渡辺 さくら','中村 拓也','小林 あかね','加藤 翔','吉田 奈々',
+  '山本 大輔','松本 由紀','井上 浩二','木村 真理','清水 航',
+  '林 えみ','阿部 義雄','池田 彩','橋本 剛','山口 千春',
+  '石川 修','前田 理恵','岡田 俊介','長谷川 葵','藤田 誠',
+  '近藤 菜々子','小川 亮','後藤 優子','村上 智也','斉藤 麻衣',
+  '坂本 聡','福田 恵','遠藤 正','西村 香織','太田 達也',
+  '市川 理沙','石田 勇','中島 朋子','藤井 隆','岸田 美穂',
+];
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function buildSched(yr, mo) {
+  const dim = new Date(yr, mo + 1, 0).getDate();
+  const s = {};
+  STAFF.forEach(n => {
+    s[n] = {};
+    for (let d = 1; d <= dim; d++) {
+      const w = new Date(yr, mo, d).getDay();
+      const isWE = w === 0 || w === 6;
+      s[n][d] = isWE
+        ? (Math.random() < .18 ? pick(SHIFTS) : '')
+        : (Math.random() < .05 ? '' : pick(SHIFTS));
+    }
+  });
+  return s;
+}
+
+const NOW = new Date();
+
+function App() {
+  const [yr, setYr] = useState(NOW.getFullYear());
+  const [mo, setMo] = useState(NOW.getMonth());
+  const [q, setQ]   = useState('');
+  const [store, setStore] = useState(() => {
+    const k = `${NOW.getFullYear()}-${NOW.getMonth()}`;
+    return { [k]: buildSched(NOW.getFullYear(), NOW.getMonth()) };
+  });
+
+  const k     = `${yr}-${mo}`;
+  const sched = store[k] || {};
+
+  const dim  = useMemo(() => new Date(yr, mo + 1, 0).getDate(), [yr, mo]);
+  const days = useMemo(() => Array.from({ length: dim }, (_, i) => i + 1), [dim]);
+  const dow  = useCallback(d => new Date(yr, mo, d).getDay(), [yr, mo]);
+  const isTd = useCallback(d =>
+    yr === NOW.getFullYear() && mo === NOW.getMonth() && d === NOW.getDate(),
+    [yr, mo]);
+
+  function go(ny, nm) {
+    if (nm < 0)  { ny--; nm = 11; }
+    if (nm > 11) { ny++; nm = 0; }
+    const nk = `${ny}-${nm}`;
+    setStore(p => p[nk] ? p : { ...p, [nk]: buildSched(ny, nm) });
+    setYr(ny); setMo(nm);
+  }
+
+  const cycle = useCallback((name, d) => {
+    setStore(p => {
+      const cur  = p[k]?.[name]?.[d] ?? '';
+      const next = CYCLE[(CYCLE.indexOf(cur) + 1) % CYCLE.length];
+      return { ...p, [k]: { ...p[k], [name]: { ...(p[k]?.[name] || {}), [d]: next } } };
+    });
+  }, [k]);
+
+  const vis = q.trim() ? STAFF.filter(n => n.replace(' ','').includes(q.replace(' ',''))) : STAFF;
+
+  const dayTot = useMemo(() => days.map(d => {
+    const t = Object.fromEntries(SHIFTS.map(s => [s, 0]));
+    STAFF.forEach(n => { const sh = sched[n]?.[d]; if (sh) t[sh]++; });
+    return t;
+  }), [sched, days]);
+
+  const staffTot = useMemo(() => {
+    const t = {};
+    vis.forEach(n => {
+      t[n] = Object.fromEntries(SHIFTS.map(s => [s, 0]));
+      days.forEach(d => { const sh = sched[n]?.[d]; if (sh) t[n][sh]++; });
+    });
+    return t;
+  }, [sched, days, vis]);
+
+  const moTot = useMemo(() => {
+    const t = Object.fromEntries(SHIFTS.map(s => [s, 0]));
+    STAFF.forEach(n => days.forEach(d => { const sh = sched[n]?.[d]; if (sh) t[sh]++; }));
+    return t;
+  }, [sched, days]);
+
+  return (
+    <div className="app">
+
+      {/* ─── HEADER ─── */}
+      <div className="hdr">
+        <h1>月間シフト表</h1>
+        <div className="nav">
+          <button className="nav-btn" onClick={() => go(yr, mo - 1)}>‹</button>
+          <span className="nav-lbl">{yr}年 {mo + 1}月</span>
+          <button className="nav-btn" onClick={() => go(yr, mo + 1)}>›</button>
+        </div>
+        <input
+          className="search"
+          placeholder="名前で絞り込み…"
+          value={q}
+          onChange={e => setQ(e.target.value)}
+        />
+        <div className="legend">
+          {SHIFTS.map(s => (
+            <span key={s} className="chip" style={{ background: C[s] }}>{s}</span>
+          ))}
+          <span className="legend-hint">｜ セルをクリックで切替</span>
+        </div>
+      </div>
+
+      {/* ─── STATS ─── */}
+      <div className="stats">
+        <span className="stats-lbl">月計</span>
+        {SHIFTS.map(s => (
+          <div key={s} className="stat">
+            <span className="chip" style={{ background: C[s] }}>{s}</span>
+            <span className="stat-cnt" style={{ color: C[s] }}>{moTot[s]}</span>
+          </div>
+        ))}
+        <span className="stats-hint">
+          クリック: 日勤 → 遅出 → 待機 → 残 → 空白 → …
+        </span>
+      </div>
+
+      {/* ─── TABLE ─── */}
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th className="c-name">職員名</th>
+              {days.map(d => {
+                const w = dow(d), td = isTd(d);
+                const cls = ['c-day', w===6?'sat-h':w===0?'sun-h':'', td?'today-h':''].filter(Boolean).join(' ');
+                return (
+                  <th key={d} className={cls}>
+                    <div className="dn">{d}</div>
+                    <div className="dw">{DOW[w]}</div>
+                  </th>
+                );
+              })}
+              <th className="c-sum">集計（日/遅/待/残）</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* daily totals row */}
+            <tr className="tot">
+              <td className="c-name" style={{ fontWeight:700 }}>日別合計</td>
+              {days.map((d, i) => {
+                const w = dow(d), td = isTd(d);
+                return (
+                  <td key={d} style={{
+                    background: td ? '#d1fae5' : (w===0||w===6) ? 'rgba(196,210,240,.32)' : undefined,
+                  }}>
+                    {SHIFTS.map(s => dayTot[i][s] > 0 && (
+                      <div key={s} style={{ color:C[s], fontWeight:700, fontSize:10, lineHeight:1.4 }}>
+                        {dayTot[i][s]}
+                      </div>
+                    ))}
+                  </td>
+                );
+              })}
+              <td className="c-sum" />
+            </tr>
+
+            {/* staff rows */}
+            {vis.map(name => {
+              const tot = staffTot[name] || {};
+              return (
+                <tr key={name}>
+                  <td className="c-name" style={{ fontWeight:500, textAlign:'left', paddingLeft:8 }}>
+                    {name}
+                  </td>
+                  {days.map(d => {
+                    const sh = sched[name]?.[d] ?? '';
+                    const w  = dow(d), td = isTd(d);
+                    const cls = ['sc', (w===0||w===6)?'we':'', td?'today-h':''].filter(Boolean).join(' ');
+                    return (
+                      <td key={d} className={cls} onClick={() => cycle(name, d)}>
+                        {sh && <span className="sb" style={{ background: C[sh] }}>{sh}</span>}
+                      </td>
+                    );
+                  })}
+                  <td className="c-sum">
+                    {SHIFTS.map(s => (
+                      <span key={s} className="sc-chip" style={{ background: C[s] }}>
+                        {tot[s] ?? 0}
+                      </span>
+                    ))}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
